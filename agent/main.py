@@ -458,7 +458,7 @@ def main():
 
     # Modes de fonctionnement
     try:
-        service_manager = ServiceManager("watchman-agent-server")
+        service_manager = ServiceManager("watchman-agent-client")
         if args.mode=='install_service':
             service_manager.install_service()
             return 0
