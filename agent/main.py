@@ -466,7 +466,7 @@ def main():
                 print(f"Démarrage du service...")
                 if service_manager.start_service():
                     print(f"Service démarré!")
-                    print(f"Le serveur est maintenant accessible sur http://{host}:{port}")
+                    print(f"Le serveur est maintenant accessible")
                     print(f"Le service redémarrera automatiquement après un reboot")
                 else:
                     print(f"❌ Échec du démarrage du service")
