@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watchman Agent Client</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #00a086 0%, #00a086 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #333;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 3rem;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .logo {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            color: #718096;
+            margin-bottom: 2rem;
+        }
+
+        .status {
+            margin-bottom: 2rem;
+            padding: 1rem;
+            border-radius: 10px;
+            font-size: 0.9rem;
+        }
+
+        .status.ready {
+            background: #f0fff4;
+            color: #22543d;
+            border: 1px solid #c6f6d5;
+        }
+
+        .status.busy {
+            background: #fffaf0;
+            color: #744210;
+            border: 1px solid #fed7aa;
+        }
+
+        .status.error {
+            background: #fed7d7;
+            color: #c53030;
+            border: 1px solid #feb2b2;
+        }
+
+        .main-button {
+            background: linear-gradient(45deg, #48bb78, #38a169);
+            color: white;
+            border: none;
+            padding: 1.2rem 2.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(72, 187, 120, 0.3);
+            width: 100%;
+            margin-bottom: 1rem;
+        }
+
+        .main-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(72, 187, 120, 0.4);
+        }
+
+        .main-button:disabled {
+            background: #e2e8f0;
+            color: #a0aec0;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ffffff;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .result.success {
+            background: #f0fff4;
+            color: #22543d;
+            border: 1px solid #c6f6d5;
+        }
+
+        .result.error {
+            background: #fed7d7;
+            color: #c53030;
+            border: 1px solid #feb2b2;
+        }
+
+        .footer {
+            margin-top: 2rem;
+            font-size: 0.8rem;
+            color: #a0aec0;
+        }
+
+        .hostname {
+            font-size: 0.9rem;
+            color: #4a5568;
+            margin-bottom: 1rem;
+            background: #f7fafc;
+            padding: 0.5rem;
+            border-radius: 5px;
+        }
+
+        .config-button {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 1rem;
+            width: 100%;
+        }
+
+        .config-button:hover {
+            background: #3182ce;
+            transform: translateY(-1px);
+        }
+
+        .server-info {
+            background: #edf2f7;
+            padding: 0.8rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 0.85rem;
+            color: #4a5568;
+        }
+
+        .server-info.configured {
+            background: #f0fff4;
+            color: #22543d;
+            border: 1px solid #c6f6d5;
+        }
+
+        .server-info.not-configured {
+            background: #fed7d7;
+            color: #c53030;
+            border: 1px solid #feb2b2;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(3px);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 2rem;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+
+        .modal-header {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 0.5rem;
+        }
+
+        .modal-subtitle {
+            font-size: 0.9rem;
+            color: #718096;
+        }
+
+        .close {
+            position: absolute;
+            right: 1rem;
+            top: 1rem;
+            color: #a0aec0;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .close:hover {
+            color: #2d3748;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #4a5568;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.8rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: border-color 0.3s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #4299e1;
+        }
+
+        .form-input:invalid {
+            border-color: #e53e3e;
+        }
+
+        .form-help {
+            font-size: 0.8rem;
+            color: #718096;
+            margin-top: 0.3rem;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 0.8rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #4299e1;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #3182ce;
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .btn-secondary:hover {
+            background: #cbd5e0;
+        }
+
+        .btn-test {
+            background: #38a169;
+            color: white;
+            margin-bottom: 1rem;
+        }
+
+        .btn-test:hover:not(:disabled) {
+            background: #2f855a;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .test-result {
+            margin-top: 0.5rem;
+            padding: 0.8rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            display: none;
+        }
+
+        .test-result.success {
+            background: #f0fff4;
+            color: #22543d;
+            border: 1px solid #c6f6d5;
+        }
+
+        .test-result.error {
+            background: #fed7d7;
+            color: #c53030;
+            border: 1px solid #feb2b2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🖥️</div>
+        <h1 class="title">Watchman Agent Client</h1>
+        <p class="subtitle">Collecte et envoi d'inventaire système</p>
+
+        <div class="hostname">
+            Machine: <strong>{{ status.hostname or 'Non détecté' }}</strong>
+        </div>
+
+        <div id="serverInfo" class="server-info">
+            <div id="serverStatus">Chargement de la configuration serveur...</div>
+        </div>
+
+        <button class="config-button" onclick="openConfigModal()">
+            ⚙️ Configurer le Serveur
+        </button>
+
+        <div id="status" class="status ready">
+            Prêt pour la collecte
+        </div>
+
+        <button id="collectBtn" class="main-button" onclick="collectAndSend()">
+            <span class="spinner" id="spinner"></span>
+            <span id="btnText">Forcer l'envoie</span>
+        </button>
+
+        <div id="result" class="result"></div>
+
+        <div class="footer">
+            Interface web locale - Version 1.0.0
+        </div>
+    </div>
+
+    <!-- Modal de configuration serveur -->
+    <div id="configModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeConfigModal()">&times;</span>
+
+            <div class="modal-header">
+                <h2 class="modal-title">Configuration du Serveur</h2>
+                <p class="modal-subtitle">Configurez les paramètres de connexion au serveur d'inventaire</p>
+            </div>
+
+            <form id="configForm">
+                <div class="form-group">
+                    <label class="form-label" for="serverUrl">URL du Serveur *</label>
+                    <input type="url" id="serverUrl" class="form-input" placeholder="https://monserveur.com/api/v1/inventory" required>
+                    <div class="form-help">URL complète de l'API d'inventaire (doit commencer par http:// ou https://)</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="authToken">Token d'Authentification</label>
+                    <input type="password" id="authToken" class="form-input" placeholder="Votre token d'authentification">
+                    <div class="form-help">Token optionnel pour l'authentification (laissez vide si non requis)</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="timeout">Timeout (secondes)</label>
+                    <input type="number" id="timeout" class="form-input" value="30" min="5" max="300">
+                    <div class="form-help">Délai d'attente pour les requêtes au serveur (5-300 secondes)</div>
+                </div>
+
+                <button type="button" class="btn btn-test" onclick="testConnection()">
+                    <span id="testSpinner" class="spinner" style="display: none;"></span>
+                    <span id="testBtnText">🔍 Tester la Connexion</span>
+                </button>
+
+                <div id="testResult" class="test-result"></div>
+
+                <div class="modal-buttons">
+                    <button type="button" class="btn btn-secondary" onclick="closeConfigModal()">Annuler</button>
+                    <button type="submit" class="btn btn-primary">💾 Sauvegarder</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let isOperationInProgress = false;
+        let currentServerConfig = null;
+
+        // === Fonctions de gestion du modal ===
+
+        function openConfigModal() {
+            // Charger la configuration actuelle
+            loadCurrentConfig();
+            document.getElementById('configModal').style.display = 'block';
+        }
+
+        function closeConfigModal() {
+            document.getElementById('configModal').style.display = 'none';
+            hideTestResult();
+        }
+
+        async function loadCurrentConfig() {
+            try {
+                const response = await fetch('/api/config/server');
+                if (response.ok) {
+                    const config = await response.json();
+                    document.getElementById('serverUrl').value = config.url || '';
+                    document.getElementById('authToken').value = config.auth_token || '';
+                    document.getElementById('timeout').value = config.timeout || 30;
+                    currentServerConfig = config;
+                }
+            } catch (error) {
+                console.error('Erreur lors du chargement de la configuration:', error);
+            }
+        }
+
+        async function saveConfig() {
+            const formData = {
+                url: document.getElementById('serverUrl').value.trim(),
+                auth_token: document.getElementById('authToken').value.trim(),
+                timeout: parseInt(document.getElementById('timeout').value)
+            };
+
+            // Validation
+            if (!formData.url) {
+                showTestResult('URL du serveur requise', false);
+                return;
+            }
+
+            if (!formData.url.match(/^https?:\/\/.+/)) {
+                showTestResult('URL invalide - doit commencer par http:// ou https://', false);
+                return;
+            }
+
+            if (formData.timeout < 5 || formData.timeout > 300) {
+                showTestResult('Timeout doit être entre 5 et 300 secondes', false);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/config/server', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showTestResult('✅ Configuration sauvegardée avec succès', true);
+                    currentServerConfig = formData;
+                    updateServerInfo();
+
+                    // Fermer le modal après 1.5 secondes
+                    setTimeout(() => {
+                        closeConfigModal();
+                    }, 1500);
+                } else {
+                    showTestResult(`❌ Erreur: ${result.message}`, false);
+                }
+
+            } catch (error) {
+                showTestResult(`❌ Erreur de connexion: ${error.message}`, false);
+            }
+        }
+
+        async function testConnection() {
+            const url = document.getElementById('serverUrl').value.trim();
+            const token = document.getElementById('authToken').value.trim();
+            const timeout = parseInt(document.getElementById('timeout').value);
+
+            if (!url) {
+                showTestResult('URL du serveur requise pour le test', false);
+                return;
+            }
+
+            if (!url.match(/^https?:\/\/.+/)) {
+                showTestResult('URL invalide - doit commencer par http:// ou https://', false);
+                return;
+            }
+
+            // Afficher le spinner
+            const testBtn = document.getElementById('testBtnText');
+            const testSpinner = document.getElementById('testSpinner');
+            const originalText = testBtn.textContent;
+
+            testBtn.textContent = 'Test en cours...';
+            testSpinner.style.display = 'inline-block';
+
+            try {
+                const response = await fetch('/api/test-connection', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url, auth_token: token, timeout })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showTestResult(`✅ ${result.message}`, true);
+                } else {
+                    showTestResult(`❌ ${result.message}`, false);
+                }
+
+            } catch (error) {
+                showTestResult(`❌ Erreur de connexion: ${error.message}`, false);
+            } finally {
+                testBtn.textContent = originalText;
+                testSpinner.style.display = 'none';
+            }
+        }
+
+        function showTestResult(message, success) {
+            const resultDiv = document.getElementById('testResult');
+            resultDiv.className = `test-result ${success ? 'success' : 'error'}`;
+            resultDiv.innerHTML = message;
+            resultDiv.style.display = 'block';
+        }
+
+        function hideTestResult() {
+            document.getElementById('testResult').style.display = 'none';
+        }
+
+        function updateServerInfo() {
+            const serverInfoDiv = document.getElementById('serverInfo');
+            const statusDiv = document.getElementById('serverStatus');
+
+            if (currentServerConfig && currentServerConfig.url) {
+                serverInfoDiv.className = 'server-info configured';
+                statusDiv.innerHTML = `
+                    <strong>✅ Serveur configuré</strong><br>
+                    URL: ${currentServerConfig.url}<br>
+                    Token: ${currentServerConfig.auth_token ? '●●●●●●●●' : 'Non configuré'}
+                `;
+            } else {
+                serverInfoDiv.className = 'server-info not-configured';
+                statusDiv.innerHTML = '<strong>⚠️ Serveur non configuré</strong><br>Cliquez sur "Configurer le Serveur" pour définir les paramètres';
+            }
+        }
+
+        // Gestionnaire pour le formulaire
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('configForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                saveConfig();
+            });
+
+            // Fermer le modal en cliquant à l'extérieur
+            window.addEventListener('click', function(event) {
+                const modal = document.getElementById('configModal');
+                if (event.target === modal) {
+                    closeConfigModal();
+                }
+            });
+        });
+
+        // === Fonctions existantes ===
+
+        function updateStatus(message, type = 'ready') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${type}`;
+            statusDiv.innerHTML = message;
+        }
+
+        function showResult(message, success = true) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = `result ${success ? 'success' : 'error'}`;
+            resultDiv.innerHTML = message;
+            resultDiv.style.display = 'block';
+        }
+
+        function hideResult() {
+            document.getElementById('result').style.display = 'none';
+        }
+
+        function setButtonState(loading = false) {
+            const btn = document.getElementById('collectBtn');
+            const spinner = document.getElementById('spinner');
+            const btnText = document.getElementById('btnText');
+
+            if (loading) {
+                btn.disabled = true;
+                spinner.style.display = 'inline-block';
+                btnText.textContent = 'Collecte et envoi en cours...';
+                isOperationInProgress = true;
+            } else {
+                btn.disabled = false;
+                spinner.style.display = 'none';
+                btnText.textContent = '🚀 Collecter et Envoyer l\'Inventaire';
+                isOperationInProgress = false;
+            }
+        }
+
+        async function collectAndSend() {
+            if (isOperationInProgress) return;
+
+            hideResult();
+            setButtonState(true);
+            updateStatus('⏳ Collecte et envoi en cours...', 'busy');
+
+            try {
+                const response = await fetch('/api/collect-and-send', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    updateStatus('✅ Collecte et envoi démarrés', 'ready');
+                    showResult('✅ Opération démarrée avec succès. Vérification du résultat...', true);
+
+                    // Attendre et vérifier le résultat
+                    setTimeout(checkOperationResult, 2000);
+                } else {
+                    updateStatus('❌ Erreur lors de l\'opération', 'error');
+                    showResult(`❌ Erreur: ${data.message}`, false);
+                    setButtonState(false);
+                }
+
+            } catch (error) {
+                updateStatus('❌ Erreur de connexion', 'error');
+                showResult(`❌ Erreur de connexion: ${error.message}`, false);
+                setButtonState(false);
+            }
+        }
+
+        async function checkOperationResult() {
+            try {
+                const response = await fetch('/api/status');
+                const status = await response.json();
+
+                if (status.collection_in_progress || status.send_in_progress) {
+                    // Opération toujours en cours
+                    setTimeout(checkOperationResult, 2000);
+                    return;
+                }
+
+                // Opération terminée
+                setButtonState(false);
+
+                if (status.last_send_success === true) {
+                    updateStatus('✅ Inventaire envoyé avec succès', 'ready');
+                    showResult('🎉 Inventaire collecté et envoyé avec succès au serveur !', true);
+                } else if (status.last_send_success === false) {
+                    updateStatus('❌ Échec de l\'envoi', 'error');
+                    showResult(`❌ Échec de l'envoi: ${status.last_send_message || 'Erreur inconnue'}`, false);
+                } else {
+                    updateStatus('⚠️ Résultat indéterminé', 'error');
+                    showResult('⚠️ Impossible de déterminer le résultat de l\'opération', false);
+                }
+
+            } catch (error) {
+                setButtonState(false);
+                updateStatus('❌ Erreur de vérification', 'error');
+                showResult(`❌ Erreur lors de la vérification: ${error.message}`, false);
+            }
+        }
+
+        // Vérifier le statut initial
+        window.addEventListener('load', async function() {
+            try {
+                const response = await fetch('/api/status');
+                const status = await response.json();
+
+                // Mettre à jour les informations serveur
+                currentServerConfig = {
+                    url: status.server_url,
+                    auth_token: status.server_configured ? 'configured' : ''
+                };
+                updateServerInfo();
+
+                if (status.collection_in_progress || status.send_in_progress) {
+                    setButtonState(true);
+                    updateStatus('⏳ Opération en cours...', 'busy');
+                    setTimeout(checkOperationResult, 1000);
+                } else if (!status.server_configured) {
+                    updateStatus('Serveur non configuré', 'error');
+                }
+            } catch (error) {
+                console.error('Erreur lors de la vérification du statut initial:', error);
+            }
+        });
+    </script>
+</body>
+</html>

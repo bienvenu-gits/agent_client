@@ -1,0 +1,15 @@
+# Core dependencies
+psutil>=5.9.0          # System information collection
+requests>=2.28.0       # HTTP client for server communication
+Flask>=2.3.0           # Web interface
+schedule>=1.2.0        # Task scheduling
+configparser>=5.3.0    # Configuration file parsing
+
+# Windows-specific
+pywin32>=306; platform_system=="Windows"  # Windows services and WMI
+
+# Development dependencies
+pytest>=7.0.0
+pytest-cov>=4.0.0
+black>=23.0.0
+flake8>=6.0.0
