@@ -460,7 +460,18 @@ def main():
     try:
         service_manager = ServiceManager("watchman-agent-client")
         if args.mode=='install_service':
-            service_manager.install_service()
+            success=service_manager.install_service()
+            if success:
+                print(f"Service installé avec succès!")
+                print(f"Démarrage du service...")
+                if service_manager.start_service():
+                    print(f"Service démarré!")
+                    print(f"Le serveur est maintenant accessible sur http://{host}:{port}")
+                    print(f"Le service redémarrera automatiquement après un reboot")
+                else:
+                    print(f"❌ Échec du démarrage du service")
+            else:
+                print(f"❌ Échec de l'installation du service")
             return 0
         elif args.mode == 'uninstall_service':
             service_manager.uninstall_service()
