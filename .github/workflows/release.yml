@@ -67,6 +67,16 @@ jobs:
       - name: Display structure of downloaded files
         run: ls -R ./artifacts
 
+      - name: Prepare release assets with unique names
+        run: |
+          mkdir -p ./release
+          # Renommer chaque fichier avec son nom final unique
+          cp ./artifacts/watchman-agent-linux-amd64/watchman-agent ./release/watchman-agent-linux-amd64
+          cp ./artifacts/watchman-agent-macos-amd64/watchman-agent ./release/watchman-agent-macos-amd64
+          cp ./artifacts/watchman-agent-windows-amd64.exe/watchman-agent.exe ./release/watchman-agent-windows-amd64.exe
+          echo "📦 Files prepared for release:"
+          ls -lh ./release/
+
       - name: Get version from tag
         id: get_version
         run: |
@@ -120,8 +130,8 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            ./artifacts/watchman-agent-windows-amd64.exe/watchman-agent.exe
-            ./artifacts/watchman-agent-linux-amd64/watchman-agent
-            ./artifacts/watchman-agent-macos-amd64/watchman-agent
+            ./release/watchman-agent-windows-amd64.exe
+            ./release/watchman-agent-linux-amd64
+            ./release/watchman-agent-macos-amd64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
