@@ -40,7 +40,7 @@ jobs:
 
       - name: Build with PyInstaller
         run: |
-          pyinstaller --onefile --name watchman-agent --console run.py
+          pyinstaller --onefile --name watchman-agent --add-data "agent/web/templates;agent/web/templates" --console run.py
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
