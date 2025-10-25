@@ -33,3 +33,4 @@ watchman_agent_v2/data/csv/*
 watchman_agent_v2/data/json/*
 watchman_agent_v2/pids/*
 watchman_agent_v2/.env
+watchman-agent-client.spec

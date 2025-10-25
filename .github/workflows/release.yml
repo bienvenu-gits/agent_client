@@ -1,0 +1,127 @@
+name: Build and Release Watchman Agent
+
+on:
+  push:
+    tags:
+      - 'v*'  # Déclenche lors d'un push de tag v1.0.0, v2.1.0, etc.
+  workflow_dispatch:  # Permet de déclencher manuellement
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: watchman-agent
+            asset_name: watchman-agent-linux-amd64
+          - os: windows-latest
+            artifact_name: watchman-agent.exe
+            asset_name: watchman-agent-windows-amd64.exe
+          - os: macos-latest
+            artifact_name: watchman-agent
+            asset_name: watchman-agent-macos-amd64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install -r requirements.txt || pip install psutil requests flask schedule configparser
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --onefile --name watchman-agent --console run.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: dist/${{ matrix.artifact_name }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Display structure of downloaded files
+        run: ls -R ./artifacts
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "version=dev-$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: Watchman Agent ${{ steps.get_version.outputs.version }}
+          body: |
+            ## Watchman Agent ${{ steps.get_version.outputs.version }}
+            
+            ### 📥 Téléchargements
+            
+            Choisissez la version correspondant à votre système d'exploitation :
+            
+            - **Windows** : `watchman-agent-windows-amd64.exe`
+            - **Linux** : `watchman-agent-linux-amd64`
+            - **macOS** : `watchman-agent-macos-amd64`
+            
+            ### 🚀 Installation
+            
+            #### Windows
+            ```cmd
+            watchman-agent-windows-amd64.exe
+            ```
+            
+            #### Linux
+            ```bash
+            chmod +x watchman-agent-linux-amd64
+            ./watchman-agent-linux-amd64
+            ```
+            
+            #### macOS
+            ```bash
+            chmod +x watchman-agent-macos-amd64
+            ./watchman-agent-macos-amd64
+            ```
+            
+            ### 📝 Changelog
+            
+            - Version initiale
+            - Support multi-plateforme (Windows, Linux, macOS)
+            
+          draft: false
+          prerelease: false
+          files: |
+            ./artifacts/watchman-agent-windows-amd64.exe/watchman-agent.exe
+            ./artifacts/watchman-agent-linux-amd64/watchman-agent
+            ./artifacts/watchman-agent-macos-amd64/watchman-agent
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
