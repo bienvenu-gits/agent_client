@@ -9,12 +9,12 @@ import platform
 import subprocess
 import tempfile
 import shutil
+import ctypes
 from pathlib import Path
 from typing import Optional, Dict, Any
 import click
 
 from agent.core.logger import AgentLogger
-
 
 
 class ServiceManager:
@@ -55,20 +55,73 @@ class ServiceManager:
             # Dernier recours : utiliser python -m
             python_exec = sys.executable
             return f"{python_exec} -m agent.main.main"
+
+    # ========== GESTION PRIVILÈGES ADMINISTRATEUR WINDOWS ==========
+    @staticmethod
+    def is_admin() -> bool:
+        """Vérifie si le script s'exécute avec les privilèges administrateur"""
+        if platform.system() != "Windows":
+            # Sur Linux/macOS, vérifier si root
+            return os.geteuid() == 0
+        
+        try:
+            return ctypes.windll.shell32.IsUserAnAdmin()
+        except:
+            return False
+
+    def request_admin_privileges(self) -> bool:
+        """
+        Demande l'élévation des privilèges administrateur sur Windows.
+        Relance le script avec UAC.
+        
+        Returns:
+            bool: False si déjà admin ou non-Windows, True si relancé avec élévation
+        """
+        if self.system != "Windows":
+            self.logger.warning("L'élévation des privilèges n'est pas nécessaire sur cet OS")
+            return False
+        
+        if self.is_admin():
+            return False  # Déjà admin, pas besoin de relancer
+        
+        self.logger.warning("⚠️ Privilèges administrateur requis pour gérer les services Windows")
+        self.logger.info("Demande d'élévation des privilèges...")
+        
+        try:
+            # Relancer le script avec élévation UAC
+            params = " ".join([f'"{arg}"' for arg in sys.argv])
+            
+            ret = ctypes.windll.shell32.ShellExecuteW(
+                None,           # hwnd
+                "runas",        # Opération : demande élévation
+                sys.executable, # Exécutable Python
+                params,         # Arguments
+                None,           # Répertoire de travail
+                1               # SW_SHOWNORMAL
+            )
+            
+            if ret > 32:  # Succès
+                self.logger.info("✓ Script relancé avec privilèges administrateur")
+                sys.exit(0)  # Quitter l'instance non-admin
+            else:
+                self.logger.error("✗ Élévation refusée par l'utilisateur")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Erreur lors de la demande d'élévation: {e}")
+            return False
     
     def install_service(self) -> bool:
         """
         Installe le service selon l'OS
 
-        Args:
-            host: Adresse IP d'écoute
-            port: Port d'écoute
-            description: Description du service
-
         Returns:
             bool: True si installation réussie
         """
         try:
+            # Vérification des privilèges pour Windows
+            
+            
             if self.system == "Windows":
                 return self._install_windows_service()
             elif self.system == "Linux":
@@ -85,6 +138,11 @@ class ServiceManager:
     def uninstall_service(self) -> bool:
         """Désinstalle le service selon l'OS"""
         try:
+            # Vérification des privilèges pour Windows
+            if self.system == "Windows" and not self.is_admin():
+                self.logger.error("❌ Privilèges administrateur requis pour désinstaller un service Windows")
+                return False
+            
             if self.system == "Windows":
                 return self._uninstall_windows_service()
             elif self.system == "Linux":
@@ -102,6 +160,9 @@ class ServiceManager:
         """Démarre le service"""
         try:
             if self.system == "Windows":
+                if not self.is_admin():
+                    self.logger.error("❌ Privilèges administrateur requis")
+                    return False
                 result = subprocess.run(['sc', 'start', self.service_name],
                                       capture_output=True, text=True)
                 return result.returncode == 0
@@ -121,6 +182,9 @@ class ServiceManager:
         """Arrête le service"""
         try:
             if self.system == "Windows":
+                if not self.is_admin():
+                    self.logger.error("❌ Privilèges administrateur requis")
+                    return False
                 result = subprocess.run(['sc', 'stop', self.service_name],
                                       capture_output=True, text=True)
                 return result.returncode == 0
@@ -173,14 +237,18 @@ class ServiceManager:
     def _install_windows_service(self) -> bool:
         """Installe un service Windows avec sc.exe"""
         command = f'"{self.executable_path}"'
+        
+        # request admin privileges
+        if not self.is_admin():
+            self.request_admin_privileges()
 
         # Création du service
         cmd = [
             'sc', 'create', self.service_name,
-            'binPath=', command,
-            'DisplayName=', f'Watchman Agent Server ',
-            'description=', 'Service pour collecter des informations système et les envoyer à une API centrale.',
-            'start=', 'auto'
+            f'binPath={command}',
+            f'DisplayName=Watchman Agent Server',
+            f'description=Service pour collecter des informations système et les envoyer à une API centrale.',
+            'start=auto'
         ]
 
         result = subprocess.run(cmd, capture_output=True, text=True)
@@ -189,7 +257,11 @@ class ServiceManager:
             return False
 
         # Configuration pour redémarrage automatique
-        subprocess.run(['sc', 'failure', self.service_name, 'reset=', '86400', 'actions=', 'restart/5000/restart/10000/restart/20000'])
+        subprocess.run([
+            'sc', 'failure', self.service_name,
+            'reset=86400',
+            'actions=restart/5000/restart/10000/restart/20000'
+        ])
 
         self.logger.info(f"Service Windows '{self.service_name}' installé avec succès")
         return True
